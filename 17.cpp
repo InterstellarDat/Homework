@@ -430,54 +430,90 @@ double measureTime(Func func, Args&&... args) {
 }
 
 int main(int argc, char* argv[]) {
-    // Check for test mode: ./main.exe -t algorithm
-    if (argc == 3 && string(argv[1]) == "-t") {
-        string algorithm = argv[2];
+    // Handle test mode: ./main.exe -r
+    if (argc == 2 && string(argv[1]) == "-r") {
+        // Define data orders, sizes, and algorithms
+        const vector<string> dataOrders = {"sorted", "nearly_sorted", "reverse_sorted", "randomized"};
+        const vector<int> dataTypes = {1, 3, 2, 0}; // Corresponds to DataGenerator.cpp
+        const vector<int> sizes = {10000, 30000, 50000, 100000};
+        const vector<string> algorithms = {
+            "selection-sort", "insertion-sort", "bubble-sort", "shaker-sort",
+            "shell-sort", "heap-sort", "merge-sort", "quick-sort",
+            "counting-sort", "radix-sort", "flash-sort"
+        };
 
-        // Data sizes and orders required by the project
-        const int sizes[] = {10000, 30000, 50000, 100000};
-        const int dataTypes[] = {0, 1, 2, 3}; // 0: randomized, 1: sorted, 2: reverse sorted, 3: nearly sorted
-        const string dataOrderNames[] = {"Randomized", "Sorted", "Reverse sorted", "Nearly sorted"};
-
-        cout << "Test Mode\n";
-        cout << "Algorithm: " << algorithm << "\n";
-
-        for (int dt = 0; dt < 4; dt++) {
-            int dataType = dataTypes[dt];
-            string dataOrder = dataOrderNames[dt];
-            cout << "Data order: " << dataOrder << "\n";
-
-            for (int size : sizes) {
-                // Generate test data
-                vector<int> arr(size);
-                GenerateData(arr.data(), size, dataType);
-
-                // Apply sorting algorithm and measure time
-                long long comparisons = 0;
-                double time_taken = measureTime([&]() { applySort(arr, algorithm, comparisons); });
-
-                // Print results for report
-                cout << "  Data size: " << size << "\n";
-                cout << "  Running time: " << time_taken << " milliseconds\n";
-                cout << "  Comparisons: " << comparisons << "\n";
-                cout << "  ------------------------\n";
-
-                // Write sorted data to output.txt for the last size of the last order
-                if (dataType == 3 && size == 100000) {
-                    writeFile(arr, "output.txt");
-                }
+        // Initialize CSV files for each data order (time and comparisons)
+        vector<ofstream> timeFiles(4);
+        vector<ofstream> compFiles(4);
+        for (size_t i = 0; i < 4; ++i) {
+            timeFiles[i].open(dataOrders[i] + "_time.csv");
+            compFiles[i].open(dataOrders[i] + "_comp.csv");
+            if (!timeFiles[i].is_open() || !compFiles[i].is_open()) {
+                cerr << "Error opening CSV file for " << dataOrders[i] << endl;
+                return 1;
             }
-            cout << "\n";
+            // Write header row
+            timeFiles[i] << "Size";
+            compFiles[i] << "Size";
+            for (const string& algo : algorithms) {
+                timeFiles[i] << "," << algo;
+                compFiles[i] << "," << algo;
+            }
+            timeFiles[i] << "\n";
+            compFiles[i] << "\n";
         }
 
+        cout << "Report Test Mode\n";
+        cout << "Generating 8 CSV files for graphs...\n";
+
+        // Iterate over data orders
+        for (size_t i = 0; i < dataOrders.size(); ++i) {
+            // For each size, collect data for all algorithms
+            for (int size : sizes) {
+                timeFiles[i] << size;
+                compFiles[i] << size;
+                for (const string& algo : algorithms) {
+                    // Create array with DataGenerator
+                    vector<int> arr(size);
+                    GenerateData(arr.data(), size, dataTypes[i]);
+
+                    // Sort and measure
+                    long long comparisons = 0;
+                    double time_taken = measureTime([&]() { applySort(arr, algo, comparisons); });
+
+                    // Write to CSV (comma-separated)
+                    timeFiles[i] << "," << time_taken;
+                    compFiles[i] << "," << comparisons;
+
+                    // Optional console output for progress
+                    cout << "Data Order: " << dataOrders[i] 
+                         << ", Size: " << size 
+                         << ", Algorithm: " << algo 
+                         << ", Time: " << time_taken << " ms"
+                         << ", Comp: " << comparisons << "\n";
+                }
+                timeFiles[i] << "\n";
+                compFiles[i] << "\n";
+            }
+        }
+
+        // Close all files
+        for (size_t i = 0; i < 4; ++i) {
+            timeFiles[i].close();
+            compFiles[i].close();
+        }
+
+        cout << "----------------\n";
+        cout << "Generated CSV files: sorted_time.csv, sorted_comp.csv, nearly_sorted_time.csv, nearly_sorted_comp.csv, "
+             << "reverse_sorted_time.csv, reverse_sorted_comp.csv, randomized_time.csv, randomized_comp.csv\n";
+
         return 0;
-    }
+    }    
 
     // Expect command: ./main.exe -a algorithm -i input.txt -o output.txt
     if (argc != 7 || string(argv[1]) != "-a" || string(argv[3]) != "-i" || string(argv[5]) != "-o") {
         cerr << "Usage: " << argv[0] << " -a algorithm -i input_file -o output_file" << endl;
         return 1;
-    } else {
     }
 
     string algorithm = argv[2];
